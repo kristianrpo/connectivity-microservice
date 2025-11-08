@@ -78,12 +78,13 @@ class RabbitMQConsumer:
             durable=True
         )
         
-        # Bind queue to exchange with routing key
-        self.channel.queue_bind(
-            exchange=self.exchange,
-            queue=self.queue_name,
-            routing_key=self.routing_key
-        )
+        # Bind queue to exchange with routing key (skip if using default exchange)
+        if self.exchange:
+            self.channel.queue_bind(
+                exchange=self.exchange,
+                queue=self.queue_name,
+                routing_key=self.routing_key
+            )
         
         logger.info(
             f"Connected to RabbitMQ. Queue: {self.queue_name}, "
