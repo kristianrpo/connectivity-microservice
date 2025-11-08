@@ -302,6 +302,18 @@ jobs:
             fi
           fi
 
+      - name: Fix random_password if needed
+        working-directory: infra/terraform/aws
+        continue-on-error: true
+        run: |
+          echo "Checking if random_password needs to be fixed..."
+          # Remove random_password from state if it has id=none
+          terraform state show random_password.db_password 2>/dev/null | grep 'id.*=.*"none"' && {
+            echo "Found random_password with id=none, removing from state..."
+            terraform state rm random_password.db_password
+            echo "✓ Removed, will be recreated"
+          } || echo "random_password looks OK or doesn't exist"
+
       - name: Terraform Apply (all microservice resources)
         working-directory: infra/terraform/aws
         run: |
