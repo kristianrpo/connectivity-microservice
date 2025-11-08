@@ -1,0 +1,81 @@
+{
+  "dashboard": {
+    "title": "Connectivity Microservice - Overview",
+    "tags": ["connectivity", "microservice", "django"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "Request Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(django_http_requests_total_by_view_transport_method_total{namespace=\"connectivity\"}[5m])",
+            "legendFormat": "{{view}} - {{method}}"
+          }
+        ]
+      },
+      {
+        "title": "Response Time (p95)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(django_http_requests_latency_seconds_by_view_method_bucket{namespace=\"connectivity\"}[5m]))",
+            "legendFormat": "{{view}} - {{method}}"
+          }
+        ]
+      },
+      {
+        "title": "Error Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(django_http_responses_total_by_status_view_method_total{namespace=\"connectivity\",status=~\"5..\"}[5m])",
+            "legendFormat": "{{status}} - {{view}}"
+          }
+        ]
+      },
+      {
+        "title": "Active Connections",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "django_db_new_connections_total{namespace=\"connectivity\"}",
+            "legendFormat": "DB Connections"
+          }
+        ]
+      },
+      {
+        "title": "Pod CPU Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{namespace=\"connectivity\",pod=~\"connectivity-service.*\"}[5m])",
+            "legendFormat": "{{pod}}"
+          }
+        ]
+      },
+      {
+        "title": "Pod Memory Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "container_memory_usage_bytes{namespace=\"connectivity\",pod=~\"connectivity-service.*\"}",
+            "legendFormat": "{{pod}}"
+          }
+        ]
+      }
+    ],
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    }
+  },
+  "overwrite": true
+}

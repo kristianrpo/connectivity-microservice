@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: connectivity-consumer
+  namespace: connectivity
+  labels:
+    app: connectivity-consumer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: connectivity-consumer
+  template:
+    metadata:
+      labels:
+        app: connectivity-consumer
+    spec:
+      serviceAccountName: connectivity-sa
+      containers:
+      - name: consumer
+        image: kristianrpo30/connectivity-microservice:latest
+        command: ["/bin/bash", "/app/start-consumers.sh"]
+        envFrom:
+        - secretRef:
+            name: connectivity-secrets
+        env:
+        - name: AWS_STS_REGIONAL_ENDPOINTS
+          value: regional
+        - name: AWS_DEFAULT_REGION
+          value: us-east-1
+        - name: AWS_REGION
+          value: us-east-1
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pgrep -f "consume_document_auth|consume_auth_events" > /dev/null
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3

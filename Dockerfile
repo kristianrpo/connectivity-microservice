@@ -39,6 +39,10 @@ ENV PATH=/home/appuser/.local/bin:$PATH
 # Copy application code
 COPY . .
 
+# Copy and set permissions for consumer script
+COPY start-consumers.sh /app/start-consumers.sh
+RUN chmod +x /app/start-consumers.sh
+
 # Create logs directory and set permissions
 RUN mkdir -p logs && \
     chown -R appuser:appuser /app
