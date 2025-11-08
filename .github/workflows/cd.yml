@@ -147,6 +147,39 @@ jobs:
             -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
             -var "aws_region=${{ secrets.AWS_REGION }}" \
             'module.irsa.aws_iam_role.this[0]' connectivity-production-service-irsa || echo "IAM role not found or already imported"
+          
+          # Import security group rules (need SG ID)
+          if [ -n "$SG_ID" ] && [ "$SG_ID" != "None" ]; then
+            # Get existing ingress rules
+            RULES=$(aws ec2 describe-security-group-rules \
+              --filters "Name=group-id,Values=$SG_ID" \
+              --query 'SecurityGroupRules[?IsEgress==`false`].SecurityGroupRuleId' \
+              --output text 2>/dev/null || echo "")
+            
+            if [ -n "$RULES" ]; then
+              RULE_ARRAY=($RULES)
+              # Import first rule (CIDR)
+              if [ ${#RULE_ARRAY[@]} -gt 0 ]; then
+                terraform import -input=false \
+                  -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+                  -var "aws_region=${{ secrets.AWS_REGION }}" \
+                  aws_vpc_security_group_ingress_rule.rds_ingress_cidr "${RULE_ARRAY[0]}" || echo "Rule 1 already imported"
+              fi
+              # Import second rule (from nodes)
+              if [ ${#RULE_ARRAY[@]} -gt 1 ]; then
+                terraform import -input=false \
+                  -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+                  -var "aws_region=${{ secrets.AWS_REGION }}" \
+                  'aws_vpc_security_group_ingress_rule.rds_ingress_from_nodes[0]' "${RULE_ARRAY[1]}" || echo "Rule 2 already imported"
+              fi
+            fi
+          fi
+          
+          # Import RDS instance
+          terraform import -input=false \
+            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            aws_db_instance.postgres connectivity-production-pg || echo "RDS instance not found or already imported"
 
       - name: Terraform Apply (microservice resources - without ALB)
         working-directory: infra/terraform/aws
