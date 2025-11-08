@@ -47,8 +47,8 @@ spec:
             command:
             - /bin/sh
             - -c
-            - pgrep -f "consume_document_auth|consume_auth_events" > /dev/null
-          initialDelaySeconds: 30
+            - pgrep -f "python.*manage.py.*consume" > /dev/null
+          initialDelaySeconds: 60
           periodSeconds: 30
           timeoutSeconds: 5
-          failureThreshold: 3
+          failureThreshold: 5
