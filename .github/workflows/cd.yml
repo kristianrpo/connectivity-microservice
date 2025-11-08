@@ -302,18 +302,6 @@ jobs:
             fi
           fi
 
-      - name: Fix random_password if needed
-        working-directory: infra/terraform/aws
-        continue-on-error: true
-        run: |
-          echo "Checking if random_password needs to be fixed..."
-          # Remove random_password from state if it has id=none
-          terraform state show random_password.db_password 2>/dev/null | grep 'id.*=.*"none"' && {
-            echo "Found random_password with id=none, removing from state..."
-            terraform state rm random_password.db_password
-            echo "✓ Removed, will be recreated"
-          } || echo "random_password looks OK or doesn't exist"
-
       - name: Terraform Apply (all microservice resources)
         working-directory: infra/terraform/aws
         run: |
@@ -518,6 +506,23 @@ jobs:
           echo "Building DATABASE_URL with SSL..."
           DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${RDS_ENDPOINT}:5432/${DB_NAME}?sslmode=require"
           
+          echo "Parsing RabbitMQ URL..."
+          echo "  Full URL: $RABBIT_URL"
+          # Parse RabbitMQ URL: amqps://user:pass@host:port/vhost
+          RABBIT_PROTO=$(echo $RABBIT_URL | cut -d':' -f1)
+          RABBIT_CREDS=$(echo $RABBIT_URL | cut -d'/' -f3 | cut -d'@' -f1)
+          RABBIT_USER=$(echo $RABBIT_CREDS | cut -d':' -f1)
+          RABBIT_PASS=$(echo $RABBIT_CREDS | cut -d':' -f2)
+          RABBIT_HOST=$(echo $RABBIT_URL | cut -d'@' -f2 | cut -d':' -f1)
+          RABBIT_PORT=$(echo $RABBIT_URL | cut -d'@' -f2 | cut -d':' -f2 | cut -d'/' -f1)
+          RABBIT_VHOST=$(echo $RABBIT_URL | cut -d'/' -f4)
+          
+          echo "  Protocol: $RABBIT_PROTO"
+          echo "  User: $RABBIT_USER"
+          echo "  Host: $RABBIT_HOST"
+          echo "  Port: $RABBIT_PORT"
+          echo "  VHost: $RABBIT_VHOST"
+          
           echo "Updating application secret in Secrets Manager..."
           aws secretsmanager put-secret-value \
             --secret-id "$SECRET_NAME" \
@@ -526,11 +531,11 @@ jobs:
               --arg debug "False" \
               --arg allowed_hosts "${{ secrets.ALLOWED_HOSTS || '*' }}" \
               --arg db_url "$DATABASE_URL" \
-              --arg rabbit_host "$(echo $RABBIT_URL | cut -d'@' -f2 | cut -d':' -f1)" \
-              --arg rabbit_port "5672" \
-              --arg rabbit_user "${{ secrets.RABBITMQ_USER || 'guest' }}" \
-              --arg rabbit_pass "${{ secrets.RABBITMQ_PASSWORD || 'guest' }}" \
-              --arg rabbit_vhost "${{ secrets.RABBITMQ_VHOST || '/' }}" \
+              --arg rabbit_host "$RABBIT_HOST" \
+              --arg rabbit_port "$RABBIT_PORT" \
+              --arg rabbit_user "$RABBIT_USER" \
+              --arg rabbit_pass "$RABBIT_PASS" \
+              --arg rabbit_vhost "${RABBIT_VHOST:-/}" \
               --arg rabbit_exchange "${{ secrets.RABBITMQ_EXCHANGE || 'connectivity' }}" \
               --arg doc_auth_queue "${{ secrets.RABBITMQ_DOCUMENT_AUTH_QUEUE || 'document.authentication.requested' }}" \
               --arg doc_auth_key "${{ secrets.RABBITMQ_DOCUMENT_AUTH_ROUTING_KEY || 'document.authentication.requested' }}" \
