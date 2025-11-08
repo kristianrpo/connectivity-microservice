@@ -64,12 +64,13 @@ class RabbitMQConsumer:
         self.connection = pika.BlockingConnection(parameters)
         self.channel = self.connection.channel()
         
-        # Declare exchange
-        self.channel.exchange_declare(
-            exchange=self.exchange,
-            exchange_type='topic',
-            durable=True
-        )
+        # Declare exchange (skip if using default exchange)
+        if self.exchange:
+            self.channel.exchange_declare(
+                exchange=self.exchange,
+                exchange_type='topic',
+                durable=True
+            )
         
         # Declare queue
         self.channel.queue_declare(

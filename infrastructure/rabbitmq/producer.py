@@ -46,12 +46,13 @@ class RabbitMQProducer:
             self.connection = pika.BlockingConnection(parameters)
             self.channel = self.connection.channel()
             
-            # Declare the exchange
-            self.channel.exchange_declare(
-                exchange=settings.RABBITMQ_EXCHANGE,
-                exchange_type='topic',
-                durable=True
-            )
+            # Declare the exchange (skip if using default exchange)
+            if settings.RABBITMQ_EXCHANGE:
+                self.channel.exchange_declare(
+                    exchange=settings.RABBITMQ_EXCHANGE,
+                    exchange_type='topic',
+                    durable=True
+                )
             
             logger.info("Successfully connected to RabbitMQ")
             
