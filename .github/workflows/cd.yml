@@ -264,13 +264,18 @@ jobs:
           
           echo ""
           echo "Verifying state file exists in S3..."
-          if aws s3 ls "s3://$TF_BACKEND_BUCKET/$TF_BACKEND_KEY"; then
+          echo "Checking: s3://$TF_BACKEND_BUCKET/$TF_BACKEND_KEY"
+          
+          if aws s3api head-object --bucket "$TF_BACKEND_BUCKET" --key "$TF_BACKEND_KEY" 2>/dev/null; then
             echo "✓ State file confirmed in S3"
-            STATE_SIZE=$(aws s3 ls "s3://$TF_BACKEND_BUCKET/$TF_BACKEND_KEY" | awk '{print $3}')
+            STATE_INFO=$(aws s3api head-object --bucket "$TF_BACKEND_BUCKET" --key "$TF_BACKEND_KEY")
+            STATE_SIZE=$(echo "$STATE_INFO" | jq -r '.ContentLength')
             echo "  Size: $STATE_SIZE bytes"
+            echo "  Last Modified: $(echo "$STATE_INFO" | jq -r '.LastModified')"
           else
             echo "⚠️ WARNING: State file not found in S3!"
-            echo "This is a critical error - state should be in S3 backend"
+            echo "Checking if backend is configured correctly..."
+            terraform show -json | jq -r '.values.root_module.resources[0].address' || echo "No resources in state"
           fi
 
   app-deploy:
@@ -306,7 +311,20 @@ jobs:
       - name: Terraform Init and Load State
         working-directory: infra/terraform/aws
         run: |
+          echo "Checking Terraform configuration files..."
+          ls -la *.tf
+          echo ""
+          echo "Checking backend configuration..."
+          grep -A 5 'backend "s3"' backend.tf || echo "Backend block not found!"
+          
+          echo ""
           echo "Initializing Terraform to read outputs..."
+          echo "Backend config:"
+          echo "  Bucket: $TF_BACKEND_BUCKET"
+          echo "  Key: $TF_BACKEND_KEY"
+          echo "  Region: $TF_BACKEND_REGION"
+          echo "  DynamoDB: $TF_BACKEND_DDB_TABLE"
+          
           terraform init -input=false -reconfigure \
             -backend-config="bucket=$TF_BACKEND_BUCKET" \
             -backend-config="key=$TF_BACKEND_KEY" \
