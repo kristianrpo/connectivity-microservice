@@ -480,23 +480,40 @@ jobs:
         env:
           TF_DIR: infra/terraform/aws
         run: |
+          echo "Getting Terraform outputs..."
           SECRET_NAME=$(terraform -chdir=$TF_DIR output -raw app_secret_name)
           RABBIT_URL=$(terraform -chdir=$TF_DIR output -raw rabbitmq_amqp_url)
           RDS_ENDPOINT=$(terraform -chdir=$TF_DIR output -raw rds_endpoint)
           
+          echo "Getting RDS credentials from Secrets Manager..."
           RDS_SECRET_ARN=$(terraform -chdir=$TF_DIR output -raw rds_secret_arn)
           RDS_CREDS=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
           DB_USER=$(echo "$RDS_CREDS" | jq -r '.username')
           DB_PASSWORD=$(echo "$RDS_CREDS" | jq -r '.password')
           DB_NAME=$(echo "$RDS_CREDS" | jq -r '.dbname')
           
+          echo "Validating credentials..."
+          echo "  DB_USER: $DB_USER"
+          echo "  DB_NAME: $DB_NAME"
+          echo "  RDS_ENDPOINT: $RDS_ENDPOINT"
+          echo "  DB_PASSWORD length: ${#DB_PASSWORD}"
+          
+          if [ -z "$DB_PASSWORD" ] || [ "$DB_PASSWORD" = "null" ]; then
+            echo "❌ ERROR: DB_PASSWORD is empty or null!"
+            exit 1
+          fi
+          
+          echo "Building DATABASE_URL with SSL..."
+          DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${RDS_ENDPOINT}:5432/${DB_NAME}?sslmode=require"
+          
+          echo "Updating application secret in Secrets Manager..."
           aws secretsmanager put-secret-value \
             --secret-id "$SECRET_NAME" \
             --secret-string "$(jq -n \
               --arg secret_key "${{ secrets.DJANGO_SECRET_KEY }}" \
               --arg debug "False" \
               --arg allowed_hosts "${{ secrets.ALLOWED_HOSTS || '*' }}" \
-              --arg db_url "postgresql://$DB_USER:$DB_PASSWORD@$RDS_ENDPOINT:5432/$DB_NAME" \
+              --arg db_url "$DATABASE_URL" \
               --arg rabbit_host "$(echo $RABBIT_URL | cut -d'@' -f2 | cut -d':' -f1)" \
               --arg rabbit_port "5672" \
               --arg rabbit_user "${{ secrets.RABBITMQ_USER || 'guest' }}" \
