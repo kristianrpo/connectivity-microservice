@@ -102,6 +102,42 @@ jobs:
           echo "Waiting 30 seconds for AWS to process..."
           sleep 30
 
+      - name: Import existing resources (if any)
+        working-directory: infra/terraform/aws
+        continue-on-error: true
+        run: |
+          echo "Attempting to import existing resources..."
+          
+          # Import security group
+          terraform import -input=false \
+            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            aws_security_group.rds connectivity-production-rds-sg || echo "Security group not found or already imported"
+          
+          # Import DB subnet group
+          terraform import -input=false \
+            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            aws_db_subnet_group.rds connectivity-production-rds-subnets || echo "DB subnet group not found or already imported"
+          
+          # Import DB parameter group
+          terraform import -input=false \
+            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            aws_db_parameter_group.rds connectivity-production-rds-params || echo "DB parameter group not found or already imported"
+          
+          # Import CloudWatch log group
+          terraform import -input=false \
+            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            aws_cloudwatch_log_group.connectivity /aws/eks/production/connectivity-microservice || echo "Log group not found or already imported"
+          
+          # Import IAM role
+          terraform import -input=false \
+            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            'module.irsa.aws_iam_role.this[0]' connectivity-production-service-irsa || echo "IAM role not found or already imported"
+
       - name: Terraform Apply (microservice resources - without ALB)
         working-directory: infra/terraform/aws
         run: |
