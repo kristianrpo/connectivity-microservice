@@ -210,6 +210,7 @@ resource "aws_db_instance" "postgres" {
   multi_az                   = false
   publicly_accessible        = false
   skip_final_snapshot        = true
+  apply_immediately          = false
   
   # Performance Insights (opcional, puede aumentar costo mínimamente)
   enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
@@ -218,6 +219,12 @@ resource "aws_db_instance" "postgres" {
     Name        = "${local.name}-postgres"
     Service     = "connectivity"
     Environment = var.environment
+  }
+  
+  lifecycle {
+    ignore_changes = [
+      password,  # Never change password after creation
+    ]
   }
 }
 
