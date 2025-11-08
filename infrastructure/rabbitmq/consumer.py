@@ -44,11 +44,19 @@ class RabbitMQConsumer:
     def connect(self):
         """Establish connection to RabbitMQ."""
         credentials = pika.PlainCredentials(self.username, self.password)
+        
+        # Configure SSL for AWS MQ if using port 5671
+        ssl_options = None
+        if self.port == 5671:
+            import ssl
+            ssl_options = pika.SSLOptions(ssl.create_default_context())
+        
         parameters = pika.ConnectionParameters(
             host=self.host,
             port=self.port,
             virtual_host=self.vhost,
             credentials=credentials,
+            ssl_options=ssl_options,
             heartbeat=600,
             blocked_connection_timeout=300
         )

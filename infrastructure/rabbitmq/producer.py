@@ -27,11 +27,18 @@ class RabbitMQProducer:
                 settings.RABBITMQ_PASSWORD
             )
             
+            # Configure SSL for AWS MQ if using port 5671
+            ssl_options = None
+            if settings.RABBITMQ_PORT == 5671:
+                import ssl
+                ssl_options = pika.SSLOptions(ssl.create_default_context())
+            
             parameters = pika.ConnectionParameters(
                 host=settings.RABBITMQ_HOST,
                 port=settings.RABBITMQ_PORT,
                 virtual_host=settings.RABBITMQ_VHOST,
                 credentials=credentials,
+                ssl_options=ssl_options,
                 heartbeat=600,
                 blocked_connection_timeout=300,
             )
