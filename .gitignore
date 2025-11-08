@@ -1,0 +1,108 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+/staticfiles/
+/media/
+logs/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+*.cover
+.cache
+nosetests.xml
+coverage.xml
+*.coveragerc
+test-results.xml
+test-output.log
+
+# Docker
+docker-compose.override.yml
+.dockerignore.local
+
+# CI/CD artifacts
+flake8-report.txt
+pylint-report.txt
+bandit-report.json
+
+# Secrets - NEVER COMMIT THESE
+*.pem
+*.key
+*.crt
+secrets/
+k8s/base/secret.yaml.local
+k8s/overlays/*/secret*.yaml
+k8s/**/secret*.yaml
+
+# Kubernetes local configs
+*.kubeconfig
+kubeconfig
+kube-config
+
+# Documentation builds
+docs/_build/
+site/
+
+# Monitoring & Data
+grafana_data/
+prometheus_data/
+mysql_data/
+redis_data/
+rabbitmq_data/
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# OS files
+Thumbs.db
+.DS_Store

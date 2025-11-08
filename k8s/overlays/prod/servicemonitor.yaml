@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: connectivity-service
+  namespace: connectivity
+  labels:
+    app: connectivity-service
+spec:
+  selector:
+    matchLabels:
+      app: connectivity-service
+  endpoints:
+    - port: http
+      path: /api/connectivity/metrics
+      interval: 15s

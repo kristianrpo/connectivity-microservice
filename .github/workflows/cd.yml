@@ -1,0 +1,301 @@
+name: Connectivity Microservice CD
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  TF_BACKEND_BUCKET: ${{ secrets.TF_BACKEND_BUCKET }}
+  TF_BACKEND_KEY: connectivity/infra/terraform/aws/terraform.tfstate
+  TF_BACKEND_REGION: ${{ secrets.AWS_REGION }}
+  TF_BACKEND_DDB_TABLE: ${{ secrets.TF_BACKEND_DDB_TABLE }}
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/connectivity-microservice
+          tags: |
+            type=sha,prefix=main-
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Image digest
+        run: echo ${{ steps.meta.outputs.digest }}
+
+  infra-apply:
+    name: Provision Microservice AWS Resources (Terraform) - Phase 1
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform Init (infra - remote state)
+        working-directory: infra/terraform/aws
+        run: |
+          terraform init -input=false -upgrade \
+            -backend-config="bucket=$TF_BACKEND_BUCKET" \
+            -backend-config="key=$TF_BACKEND_KEY" \
+            -backend-config="region=$TF_BACKEND_REGION" \
+            -backend-config="dynamodb_table=$TF_BACKEND_DDB_TABLE" \
+            -backend-config="encrypt=true"
+
+      - name: Terraform Validate (infra)
+        working-directory: infra/terraform/aws
+        run: terraform validate
+
+      - name: Clean up scheduled-for-deletion secrets
+        run: |
+          echo "Checking for secrets scheduled for deletion..."
+          aws secretsmanager list-secrets --region ${{ secrets.AWS_REGION }} \
+            --filters Key=name,Values=connectivity --output json | \
+            jq -r '.SecretList[] | select(.DeletedDate != null) | .ARN' | \
+            while read -r secret_arn; do
+              if [ -n "$secret_arn" ]; then
+                echo "Force deleting secret: $secret_arn"
+                aws secretsmanager delete-secret --secret-id "$secret_arn" \
+                  --region ${{ secrets.AWS_REGION }} \
+                  --force-delete-without-recovery || true
+              fi
+            done
+          echo "Waiting 30 seconds for AWS to process..."
+          sleep 30
+
+      - name: Terraform Apply (microservice resources - without ALB)
+        working-directory: infra/terraform/aws
+        run: |
+          terraform apply -auto-approve -input=false \
+            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+            -target random_id.suffix \
+            -target data.aws_instances.eks_nodes \
+            -target data.aws_instance.eks_node_sample \
+            -target aws_security_group.rds \
+            -target aws_vpc_security_group_ingress_rule.rds_ingress_cidr \
+            -target aws_vpc_security_group_ingress_rule.rds_ingress_from_nodes \
+            -target aws_secretsmanager_secret.app \
+            -target aws_secretsmanager_secret.rds_credentials \
+            -target aws_secretsmanager_secret_version.rds_credentials_initial \
+            -target aws_secretsmanager_secret_version.rds_credentials_with_host \
+            -target aws_secretsmanager_secret.app_connections \
+            -target aws_secretsmanager_secret_version.app_connections \
+            -target aws_db_instance.postgres \
+            -target data.aws_iam_policy_document.service_policy \
+            -target aws_iam_policy.service \
+            -target data.aws_iam_policy_document.external_secrets \
+            -target aws_iam_policy.external_secrets \
+            -target aws_iam_role_policy_attachment.eso_attach \
+            -target module.irsa
+
+  app-deploy:
+    name: Deploy Application to EKS (kubectl/kustomize) - Phase 2
+    runs-on: ubuntu-latest
+    needs: [build-and-push, infra-apply]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install kubectl
+        run: |
+          KUBECTL_VERSION=$(curl -sL https://dl.k8s.io/release/stable.txt)
+          curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/kubectl
+          kubectl version --client
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: infra/terraform/aws
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=$TF_BACKEND_BUCKET" \
+            -backend-config="key=$TF_BACKEND_KEY" \
+            -backend-config="region=$TF_BACKEND_REGION" \
+            -backend-config="dynamodb_table=$TF_BACKEND_DDB_TABLE" \
+            -backend-config="encrypt=true"
+
+      - name: Update kubeconfig
+        run: |
+          CLUSTER_NAME=$(terraform -chdir=infra/terraform/aws output -raw cluster_name)
+          aws eks update-kubeconfig --name "$CLUSTER_NAME" --region ${{ secrets.AWS_REGION }}
+
+      - name: Prepare AWS Secrets for app
+        env:
+          TF_DIR: infra/terraform/aws
+        run: |
+          SECRET_NAME=$(terraform -chdir=$TF_DIR output -raw secretsmanager_secret_name)
+          RABBIT_URL=$(terraform -chdir=$TF_DIR output -raw rabbitmq_amqp_url)
+          RDS_ENDPOINT=$(terraform -chdir=$TF_DIR output -raw rds_endpoint)
+          
+          RDS_SECRET_ARN=$(terraform -chdir=$TF_DIR output -raw rds_secret_arn)
+          RDS_CREDS=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
+          DB_USER=$(echo "$RDS_CREDS" | jq -r '.username')
+          DB_PASSWORD=$(echo "$RDS_CREDS" | jq -r '.password')
+          DB_NAME=$(echo "$RDS_CREDS" | jq -r '.dbname')
+          
+          aws secretsmanager put-secret-value \
+            --secret-id "$SECRET_NAME" \
+            --secret-string "$(jq -n \
+              --arg secret_key "${{ secrets.DJANGO_SECRET_KEY }}" \
+              --arg debug "False" \
+              --arg allowed_hosts "${{ secrets.ALLOWED_HOSTS || '*' }}" \
+              --arg db_url "postgresql://$DB_USER:$DB_PASSWORD@$RDS_ENDPOINT:5432/$DB_NAME" \
+              --arg rabbit_host "$(echo $RABBIT_URL | cut -d'@' -f2 | cut -d':' -f1)" \
+              --arg rabbit_port "5672" \
+              --arg rabbit_user "${{ secrets.RABBITMQ_USER || 'guest' }}" \
+              --arg rabbit_pass "${{ secrets.RABBITMQ_PASSWORD || 'guest' }}" \
+              --arg rabbit_vhost "${{ secrets.RABBITMQ_VHOST || '/' }}" \
+              --arg rabbit_exchange "${{ secrets.RABBITMQ_EXCHANGE || 'connectivity' }}" \
+              --arg doc_auth_queue "${{ secrets.RABBITMQ_DOCUMENT_AUTH_QUEUE || 'document.authentication.requested' }}" \
+              --arg doc_auth_key "${{ secrets.RABBITMQ_DOCUMENT_AUTH_ROUTING_KEY || 'document.authentication.requested' }}" \
+              --arg user_reg_queue "${{ secrets.RABBITMQ_AUTH_USER_REGISTERED_QUEUE || 'auth.user.registered' }}" \
+              --arg user_reg_key "${{ secrets.RABBITMQ_AUTH_USER_REGISTERED_ROUTING_KEY || 'auth.user.registered' }}" \
+              --arg ext_api_url "${{ secrets.EXTERNAL_GOVCARPETA_API_URL }}" \
+              --arg ext_api_key "${{ secrets.EXTERNAL_GOVCARPETA_API_KEY || '' }}" \
+              --arg ext_api_timeout "${{ secrets.EXTERNAL_API_TIMEOUT || '30' }}" \
+              --arg jwt_secret "${{ secrets.AUTH_SERVICE_JWT_SECRET }}" \
+              --arg jwt_algo "${{ secrets.AUTH_SERVICE_JWT_ALGORITHM || 'HS256' }}" \
+              --arg cors_origins "${{ secrets.CORS_ALLOWED_ORIGINS || '' }}" \
+              --arg log_level "${{ secrets.LOG_LEVEL || 'INFO' }}" \
+              --arg app_env "${{ secrets.APP_ENV || 'production' }}" \
+              '{
+                SECRET_KEY: $secret_key,
+                DEBUG: $debug,
+                ALLOWED_HOSTS: $allowed_hosts,
+                DATABASE_URL: $db_url,
+                RABBITMQ_HOST: $rabbit_host,
+                RABBITMQ_PORT: $rabbit_port,
+                RABBITMQ_USER: $rabbit_user,
+                RABBITMQ_PASSWORD: $rabbit_pass,
+                RABBITMQ_VHOST: $rabbit_vhost,
+                RABBITMQ_EXCHANGE: $rabbit_exchange,
+                RABBITMQ_DOCUMENT_AUTH_QUEUE: $doc_auth_queue,
+                RABBITMQ_DOCUMENT_AUTH_ROUTING_KEY: $doc_auth_key,
+                RABBITMQ_AUTH_USER_REGISTERED_QUEUE: $user_reg_queue,
+                RABBITMQ_AUTH_USER_REGISTERED_ROUTING_KEY: $user_reg_key,
+                EXTERNAL_GOVCARPETA_API_URL: $ext_api_url,
+                EXTERNAL_GOVCARPETA_API_KEY: $ext_api_key,
+                EXTERNAL_API_TIMEOUT: $ext_api_timeout,
+                AUTH_SERVICE_JWT_SECRET: $jwt_secret,
+                AUTH_SERVICE_JWT_ALGORITHM: $jwt_algo,
+                CORS_ALLOWED_ORIGINS: $cors_origins,
+                LOG_LEVEL: $log_level,
+                APP_ENV: $app_env
+              }')" || true
+
+      - name: Render K8s templates
+        env:
+          TF_DIR: infra/terraform/aws
+        run: |
+          set -euo pipefail
+          SECRET_NAME=$(terraform -chdir=$TF_DIR output -raw secretsmanager_secret_name)
+          REGION='${{ secrets.AWS_REGION }}'
+          IRSA_ROLE=$(terraform -chdir=$TF_DIR output -raw irsa_role_arn)
+          
+          sed -i "s|__AWS_REGION__|$REGION|g" k8s/overlays/prod/externalsecrets.yaml
+          sed -i "s|__AWS_SECRET_NAME__|$SECRET_NAME|g" k8s/overlays/prod/externalsecrets.yaml
+          sed -i "s|IRSA_ROLE_ARN|$IRSA_ROLE|g" k8s/base/service-account.yaml
+
+      - name: Delete old ExternalSecret
+        run: |
+          kubectl -n connectivity delete externalsecret connectivity-secrets --ignore-not-found=true
+          sleep 5
+
+      - name: Deploy application
+        run: kubectl apply -k k8s/overlays/prod/
+
+      - name: Force rolling update
+        run: kubectl rollout restart deployment/connectivity-service -n connectivity
+
+      - name: Wait for External Secrets
+        run: |
+          for i in {1..12}; do
+            if kubectl -n connectivity get secret connectivity-secrets &>/dev/null; then
+              echo "Secret created successfully!"
+              break
+            fi
+            echo "Waiting... (attempt $i/12)"
+            sleep 5
+          done
+
+      - name: Wait for deployment rollout
+        run: kubectl -n connectivity rollout status deploy/connectivity-service --timeout=300s
+
+      - name: Verify migrations ran successfully
+        run: |
+          echo "Checking if migrations ran successfully via init container..."
+          POD=$(kubectl -n connectivity get pods -l app=connectivity-service --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+          if [ -n "$POD" ]; then
+            echo "✓ Pod is running: $POD"
+            echo ""
+            echo "=== Init Container Logs (Migrations) ==="
+            kubectl -n connectivity logs "$POD" -c run-migrations || echo "Init container logs not available (already completed)"
+          else
+            echo "Warning: No running pods found yet"
+          fi
+
+      - name: Display Access Information
+        run: |
+          echo "=== Deployment Summary ==="
+          ALB_HOSTNAME=$(kubectl -n connectivity get ingress connectivity-ingress -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+          if [ -n "$ALB_HOSTNAME" ]; then
+            echo "  Hostname: $ALB_HOSTNAME"
+            echo "  API: http://$ALB_HOSTNAME/api/connectivity"
+            echo "  Health: http://$ALB_HOSTNAME/api/connectivity/health/"
+            echo "  Docs: http://$ALB_HOSTNAME/api/connectivity/docs/"
+          else
+            echo "  Pending... Waiting for ALB"
+          fi

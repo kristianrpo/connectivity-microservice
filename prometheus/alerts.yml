@@ -1,0 +1,209 @@
+groups:
+  # HTTP/API Alerts
+  - name: http_alerts
+    interval: 30s
+    rules:
+      # High error rate (4xx/5xx)
+      - alert: HighErrorRate
+        expr: |
+          (sum(rate(django_http_responses_total_by_status_total{status=~"4..|5.."}[5m]))
+          / sum(rate(django_http_responses_total_by_status_total[5m]))) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High HTTP error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      # Critical error rate
+      - alert: CriticalErrorRate
+        expr: |
+          (sum(rate(django_http_responses_total_by_status_total{status=~"5.."}[5m]))
+          / sum(rate(django_http_responses_total_by_status_total[5m]))) > 0.10
+        for: 1m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "Critical HTTP 5xx error rate"
+          description: "Server error rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+
+      # Slow requests
+      - alert: SlowRequests
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(django_http_requests_latency_seconds_by_view_method_bucket[5m])) 
+            by (le, view)) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Slow API requests detected"
+          description: "95th percentile latency is {{ $value }}s on view {{ $labels.view }} (threshold: 2s)"
+
+      # Service down
+      - alert: ServiceDown
+        expr: up{job="connectivity-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: service
+        annotations:
+          summary: "Connectivity service is down"
+          description: "The connectivity microservice has been down for more than 1 minute"
+
+  # External API Alerts
+  - name: external_api_alerts
+    interval: 30s
+    rules:
+      # High external API error rate
+      - alert: HighExternalAPIErrorRate
+        expr: |
+          (sum(rate(django_http_responses_total_by_status_total{view=~".*external.*", status=~"5.."}[5m]))
+          / sum(rate(django_http_responses_total_by_status_total{view=~".*external.*"}[5m]))) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+          component: external_api
+        annotations:
+          summary: "High external API error rate"
+          description: "External API error rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+
+      # Citizen validation failures
+      - alert: HighCitizenValidationFailures
+        expr: |
+          rate(django_http_responses_total_by_status_total{view=~".*citizen.*", status=~"4..|5.."}[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: citizen_validation
+        annotations:
+          summary: "High citizen validation failure rate"
+          description: "Citizen validation failing at {{ $value }} errors/second"
+
+  # Database Alerts (PostgreSQL)
+  - name: database_alerts
+    interval: 30s
+    rules:
+      # High database error rate
+      - alert: HighDatabaseErrorRate
+        expr: |
+          sum(rate(django_db_errors_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database error rate"
+          description: "Database operations failing at {{ $value }} errors/second"
+
+      # Slow database queries
+      - alert: SlowDatabaseQueries
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(django_db_query_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "95th percentile query time is {{ $value }}s (threshold: 1s)"
+
+      # Database connection issues
+      - alert: DatabaseConnectionIssues
+        expr: |
+          sum(rate(django_db_new_connection_errors_total[5m])) > 0.05
+        for: 3m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database connection issues"
+          description: "Database connection errors at {{ $value }} errors/second"
+
+  # RabbitMQ Alerts
+  - name: rabbitmq_alerts
+    interval: 30s
+    rules:
+      # High message queue errors
+      - alert: HighMessageQueueErrors
+        expr: |
+          rate(rabbitmq_queue_messages_returned_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: rabbitmq
+        annotations:
+          summary: "High RabbitMQ message errors"
+          description: "Messages being returned at {{ $value }} messages/second"
+
+      # Queue depth too high
+      - alert: HighQueueDepth
+        expr: |
+          rabbitmq_queue_messages_ready > 1000
+        for: 10m
+        labels:
+          severity: warning
+          component: rabbitmq
+        annotations:
+          summary: "High queue depth"
+          description: "Queue has {{ $value }} messages waiting (threshold: 1000)"
+
+  # Resource Alerts
+  - name: resource_alerts
+    interval: 30s
+    rules:
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: |
+          process_resident_memory_bytes / 1024 / 1024 > 400
+        for: 5m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "High memory usage"
+          description: "Service is using {{ $value }}MB of memory (threshold: 400MB)"
+
+      # High request concurrency
+      - alert: HighRequestConcurrency
+        expr: |
+          django_http_requests_total_by_transport_total > 50
+        for: 2m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "High concurrent request load"
+          description: "Service is handling high concurrent requests (threshold: 50)"
+
+  # Security Alerts
+  - name: security_alerts
+    interval: 1m
+    rules:
+      # High unauthorized access attempts
+      - alert: HighUnauthorizedAttempts
+        expr: |
+          rate(django_http_responses_total_by_status_total{status="401"}[5m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "High unauthorized access attempts"
+          description: "Unauthorized requests at {{ $value }} requests/second"
+
+      # Suspicious activity
+      - alert: SuspiciousActivity
+        expr: |
+          rate(django_http_responses_total_by_status_total{status="403"}[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Suspicious forbidden access attempts"
+          description: "Forbidden requests at {{ $value }} requests/second"
