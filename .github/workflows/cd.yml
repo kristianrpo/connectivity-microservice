@@ -551,7 +551,7 @@ jobs:
               --arg rabbit_user "$RABBIT_USER" \
               --arg rabbit_pass "$RABBIT_PASS" \
               --arg rabbit_vhost "${RABBIT_VHOST:-/}" \
-              --arg rabbit_exchange "${{ secrets.RABBITMQ_EXCHANGE || 'connectivity' }}" \
+              --arg rabbit_exchange "${{ secrets.RABBITMQ_EXCHANGE || '' }}" \
               --arg doc_auth_queue "${{ secrets.RABBITMQ_DOCUMENT_AUTH_QUEUE || 'document.authentication.requested' }}" \
               --arg doc_auth_key "${{ secrets.RABBITMQ_DOCUMENT_AUTH_ROUTING_KEY || 'document.authentication.requested' }}" \
               --arg user_reg_queue "${{ secrets.RABBITMQ_AUTH_USER_REGISTERED_QUEUE || 'auth.user.registered' }}" \
@@ -615,7 +615,11 @@ jobs:
 
       - name: Force rolling update
         if: steps.check_ready.outputs.deployment_ready == 'true'
-        run: kubectl rollout restart deployment/connectivity-service -n connectivity
+        run: |
+          echo "Restarting service deployment..."
+          kubectl rollout restart deployment/connectivity-service -n connectivity
+          echo "Restarting consumer deployment..."
+          kubectl rollout restart deployment/connectivity-consumer -n connectivity
 
       - name: Wait for External Secrets
         if: steps.check_ready.outputs.deployment_ready == 'true'
@@ -631,7 +635,16 @@ jobs:
 
       - name: Wait for deployment rollout
         if: steps.check_ready.outputs.deployment_ready == 'true'
-        run: kubectl -n connectivity rollout status deploy/connectivity-service --timeout=300s
+        run: |
+          echo "Waiting for service deployment..."
+          kubectl -n connectivity rollout status deploy/connectivity-service --timeout=300s
+          
+          echo ""
+          echo "Waiting for consumer deployment..."
+          kubectl -n connectivity rollout status deploy/connectivity-consumer --timeout=300s
+          
+          echo ""
+          echo "✅ Both deployments rolled out successfully"
 
       - name: Verify migrations ran successfully
         if: steps.check_ready.outputs.deployment_ready == 'true'
