@@ -312,6 +312,21 @@ jobs:
           
           echo ""
           echo "✓ Terraform apply completed"
+          
+          echo ""
+          echo "Syncing RDS password with Terraform state..."
+          RDS_SECRET_ARN=$(terraform output -raw rds_secret_arn)
+          RDS_CREDS=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
+          DB_PASSWORD=$(echo "$RDS_CREDS" | jq -r '.password')
+          
+          echo "Updating RDS master password to match Terraform state..."
+          aws rds modify-db-instance \
+            --db-instance-identifier connectivity-production-pg \
+            --master-user-password "$DB_PASSWORD" \
+            --apply-immediately \
+            --region ${{ secrets.AWS_REGION }} > /dev/null
+          
+          echo "✓ RDS password synchronized"
           echo ""
           echo "Verifying state was saved to S3..."
           echo "Backend: s3://$TF_BACKEND_BUCKET/$TF_BACKEND_KEY"
