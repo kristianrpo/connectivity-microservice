@@ -168,9 +168,47 @@ jobs:
             -backend-config="dynamodb_table=$TF_BACKEND_DDB_TABLE" \
             -backend-config="encrypt=true"
 
+      - name: Debug shared infrastructure outputs
+        run: |
+          echo "=== Checking shared infrastructure remote state ==="
+          cd infra/terraform/aws
+          terraform console <<EOF
+          data.terraform_remote_state.shared.outputs
+          EOF
+
       - name: Update kubeconfig
         run: |
-          CLUSTER_NAME=$(terraform -chdir=infra/terraform/aws output -raw cluster_name)
+          echo "=== Debugging Terraform outputs ==="
+          echo "All outputs:"
+          terraform -chdir=infra/terraform/aws output
+          echo ""
+          echo "Cluster name output (raw):"
+          terraform -chdir=infra/terraform/aws output -raw cluster_name || echo "Failed to get raw output"
+          echo ""
+          echo "Cluster name output (json):"
+          terraform -chdir=infra/terraform/aws output -json cluster_name || echo "Failed to get json output"
+          echo ""
+          
+          CLUSTER_NAME=$(terraform -chdir=infra/terraform/aws output -raw cluster_name 2>&1)
+          echo "Captured cluster name: '$CLUSTER_NAME'"
+          echo "Length: ${#CLUSTER_NAME} characters"
+          
+          # Trim whitespace and newlines
+          CLUSTER_NAME=$(echo "$CLUSTER_NAME" | tr -d '\n' | xargs)
+          echo "Trimmed cluster name: '$CLUSTER_NAME'"
+          echo "Trimmed length: ${#CLUSTER_NAME} characters"
+          
+          if [ ${#CLUSTER_NAME} -gt 100 ]; then
+            echo "ERROR: Cluster name is still too long after trimming"
+            exit 1
+          fi
+          
+          if [ -z "$CLUSTER_NAME" ]; then
+            echo "ERROR: Cluster name is empty"
+            exit 1
+          fi
+          
+          echo "Updating kubeconfig with cluster: $CLUSTER_NAME"
           aws eks update-kubeconfig --name "$CLUSTER_NAME" --region ${{ secrets.AWS_REGION }}
 
       - name: Prepare AWS Secrets for app
