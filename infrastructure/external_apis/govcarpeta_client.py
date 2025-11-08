@@ -86,8 +86,7 @@ class GovcarpetaAPIClient(BaseAPIClient):
         id_citizen: int,
         name: str,
         email: str,
-        address: str = "Cra 44 # 45 - 67",
-        operator_name: str = "Coordenador Ciudadano"
+        address: str = "N/A"
     ) -> Dict[str, Any]:
         """
         Register a citizen in the external centralizer.
@@ -97,7 +96,6 @@ class GovcarpetaAPIClient(BaseAPIClient):
             name: Citizen full name
             email: Citizen email
             address: Citizen address (optional)
-            operator_name: Operator name (optional)
             
         Returns:
             Dictionary with registration result
@@ -107,18 +105,29 @@ class GovcarpetaAPIClient(BaseAPIClient):
         """
         endpoint = "apis/registerCitizen"
         
+        # Get operator configuration from settings
+        operator_id = settings.EXTERNAL_GOVCARPETA_OPERATOR_ID
+        operator_name = settings.EXTERNAL_GOVCARPETA_OPERATOR_NAME
+        
         payload = {
             "id": id_citizen,
             "name": name,
             "address": address,
             "email": email,
+            "operatorId": operator_id,
             "operatorName": operator_name
         }
         
         logger.info(f"Registering citizen {id_citizen} in centralizer")
+        logger.info(f"Payload: {payload}")
+        logger.info(f"Full URL: {self.base_url}/{endpoint}")
         
         try:
             response = self.post(endpoint, data=payload)
+            
+            logger.info(f"Response status: {response.status_code}")
+            logger.info(f"Response headers: {dict(response.headers)}")
+            logger.info(f"Response body: {response.text[:500] if response.text else 'Empty'}")
             
             if response.status_code == 201:
                 logger.info(f"Citizen {id_citizen} registered successfully")

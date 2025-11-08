@@ -559,6 +559,8 @@ jobs:
               --arg ext_api_url "${{ secrets.EXTERNAL_GOVCARPETA_API_URL }}" \
               --arg ext_api_key "${{ secrets.EXTERNAL_GOVCARPETA_API_KEY || '' }}" \
               --arg ext_api_timeout "${{ secrets.EXTERNAL_API_TIMEOUT || '30' }}" \
+              --arg ext_operator_id "${{ secrets.EXTERNAL_GOVCARPETA_OPERATOR_ID || '65ca0a00d833e984e26087569' }}" \
+              --arg ext_operator_name "${{ secrets.EXTERNAL_GOVCARPETA_OPERATOR_NAME || 'Operador Ciudadano CCP' }}" \
               --arg jwt_secret "${{ secrets.AUTH_SERVICE_JWT_SECRET }}" \
               --arg jwt_algo "${{ secrets.AUTH_SERVICE_JWT_ALGORITHM || 'HS256' }}" \
               --arg cors_origins "${{ secrets.CORS_ALLOWED_ORIGINS || '' }}" \
@@ -582,6 +584,8 @@ jobs:
                 EXTERNAL_GOVCARPETA_API_URL: $ext_api_url,
                 EXTERNAL_GOVCARPETA_API_KEY: $ext_api_key,
                 EXTERNAL_API_TIMEOUT: $ext_api_timeout,
+                EXTERNAL_GOVCARPETA_OPERATOR_ID: $ext_operator_id,
+                EXTERNAL_GOVCARPETA_OPERATOR_NAME: $ext_operator_name,
                 AUTH_SERVICE_JWT_SECRET: $jwt_secret,
                 AUTH_SERVICE_JWT_ALGORITHM: $jwt_algo,
                 CORS_ALLOWED_ORIGINS: $cors_origins,

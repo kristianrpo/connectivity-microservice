@@ -231,6 +231,10 @@ EXTERNAL_GOVCARPETA_API_URL = env('EXTERNAL_GOVCARPETA_API_URL', default='https:
 EXTERNAL_GOVCARPETA_API_KEY = env('EXTERNAL_GOVCARPETA_API_KEY', default='')
 EXTERNAL_API_TIMEOUT = env.int('EXTERNAL_API_TIMEOUT', default=30)
 
+# Operator configuration for citizen registration
+EXTERNAL_GOVCARPETA_OPERATOR_ID = env('EXTERNAL_GOVCARPETA_OPERATOR_ID', default='65ca0a00d833e984e26087569')
+EXTERNAL_GOVCARPETA_OPERATOR_NAME = env('EXTERNAL_GOVCARPETA_OPERATOR_NAME', default='Operador Ciudadano CCP')
+
 # ==============================================================================
 # AUTH MICROSERVICE INTEGRATION (OAuth2 Client Credentials)
 # ==============================================================================
