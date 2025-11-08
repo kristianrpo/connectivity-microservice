@@ -314,7 +314,7 @@ jobs:
         env:
           TF_DIR: infra/terraform/aws
         run: |
-          SECRET_NAME=$(terraform -chdir=$TF_DIR output -raw secretsmanager_secret_name)
+          SECRET_NAME=$(terraform -chdir=$TF_DIR output -raw app_secret_name)
           RABBIT_URL=$(terraform -chdir=$TF_DIR output -raw rabbitmq_amqp_url)
           RDS_ENDPOINT=$(terraform -chdir=$TF_DIR output -raw rds_endpoint)
           
@@ -379,7 +379,7 @@ jobs:
           TF_DIR: infra/terraform/aws
         run: |
           set -euo pipefail
-          SECRET_NAME=$(terraform -chdir=$TF_DIR output -raw secretsmanager_secret_name)
+          SECRET_NAME=$(terraform -chdir=$TF_DIR output -raw app_secret_name)
           REGION='${{ secrets.AWS_REGION }}'
           IRSA_ROLE=$(terraform -chdir=$TF_DIR output -raw irsa_role_arn)
           
