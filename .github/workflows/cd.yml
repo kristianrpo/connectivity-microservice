@@ -107,6 +107,7 @@ jobs:
         run: |
           terraform apply -auto-approve -input=false \
             -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
             -target random_id.suffix \
             -target data.aws_instances.eks_nodes \
             -target data.aws_instance.eks_node_sample \

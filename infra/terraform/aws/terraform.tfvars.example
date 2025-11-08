@@ -1,0 +1,37 @@
+# ============================================================================
+# Terraform Variables Example
+# ============================================================================
+# Copy this file to terraform.tfvars and update with your values
+# DO NOT commit terraform.tfvars to version control!
+
+# Backend Configuration (passed via CLI in CI/CD)
+# tf_backend_bucket = "my-terraform-state-bucket"
+# aws_region        = "us-east-1"
+
+# Shared Infrastructure
+shared_state_key = "shared/infra/terraform/aws/terraform.tfstate"
+
+# Project Configuration
+project     = "connectivity"
+environment = "production"
+
+# Database Configuration
+db_instance_class          = "db.t3.micro"
+db_allocated_storage       = 20
+db_engine_version          = "16.3"
+db_name                    = "connectivity_db"
+db_username                = "connectivity_admin"
+db_backup_retention_period = 7
+db_multi_az                = false
+
+# Application Configuration
+app_port     = 8000
+app_replicas = 2
+
+# Tags
+tags = {
+  Project      = "connectivity"
+  ManagedBy    = "Terraform"
+  Microservice = "connectivity"
+  Environment  = "production"
+}
