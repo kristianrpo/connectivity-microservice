@@ -282,7 +282,7 @@ jobs:
         with:
           terraform_wrapper: false
 
-      - name: Terraform Init and Refresh
+      - name: Terraform Init and Load State
         working-directory: infra/terraform/aws
         run: |
           echo "Initializing Terraform to read outputs..."
@@ -293,13 +293,26 @@ jobs:
             -backend-config="dynamodb_table=$TF_BACKEND_DDB_TABLE" \
             -backend-config="encrypt=true"
           
-          echo "Refreshing state to load outputs..."
-          terraform refresh -input=false \
-            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
-            -var "aws_region=${{ secrets.AWS_REGION }}" > /dev/null
+          echo ""
+          echo "Waiting for S3 state to sync (eventual consistency)..."
+          sleep 15
           
-          echo "Verifying outputs are available..."
+          echo ""
+          echo "Loading state from backend..."
+          terraform state pull > /dev/null
+          
+          echo ""
+          echo "All available outputs:"
           terraform output
+          
+          echo ""
+          echo "Checking critical outputs individually..."
+          echo -n "  rds_endpoint: "
+          terraform output -raw rds_endpoint 2>/dev/null && echo "✓" || echo "MISSING"
+          echo -n "  rds_secret_arn: "
+          terraform output -raw rds_secret_arn 2>/dev/null && echo "✓" || echo "MISSING"
+          echo -n "  irsa_role_arn: "
+          terraform output -raw irsa_role_arn 2>/dev/null && echo "✓" || echo "MISSING"
 
       - name: Update kubeconfig
         run: |
