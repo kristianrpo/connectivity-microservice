@@ -1,22 +1,7 @@
 # ============================================================================
 # Provider Configuration
 # ============================================================================
-# Note: Variables are declared in variables.tf
-
-terraform {
-  required_version = ">= 1.0"
-  
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-    random = {
-      source  = "hashicorp/random"
-      version = "~> 3.0"
-    }
-  }
-}
+# Note: terraform block with required_providers is in backend.tf
 
 provider "aws" {
   region = var.aws_region
