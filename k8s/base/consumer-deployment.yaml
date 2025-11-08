@@ -37,18 +37,18 @@ spec:
           value: us-east-1
         resources:
           requests:
-            memory: "256Mi"
-            cpu: "100m"
-          limits:
             memory: "512Mi"
-            cpu: "500m"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
         livenessProbe:
           exec:
             command:
             - /bin/sh
             - -c
             - pgrep -f "python.*manage.py.*consume" > /dev/null
-          initialDelaySeconds: 60
-          periodSeconds: 30
-          timeoutSeconds: 5
-          failureThreshold: 5
+          initialDelaySeconds: 120
+          periodSeconds: 60
+          timeoutSeconds: 10
+          failureThreshold: 10
