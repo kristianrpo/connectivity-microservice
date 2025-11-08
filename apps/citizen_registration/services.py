@@ -63,22 +63,28 @@ class CitizenRegistrationService:
         )
         
         try:
-            # TODO: Call external API to register citizen in centralizer
-            # api_response = self.api_client.register_citizen(
-            #     id_citizen=id_citizen,
-            #     name=name,
-            #     email=email
-            # )
-            
             logger.info(f"Sending registration request to centralizer for citizen {id_citizen}")
             
-            # Placeholder: Mark as sent
-            trace.mark_as_sent(
-                status_code=201,
-                response_data={'forwarded': True}
+            # Call external API to register citizen in centralizer
+            api_response = self.api_client.register_citizen(
+                id_citizen=id_citizen,
+                name=name,
+                email=email
             )
             
-            logger.info(f"Registration request sent for citizen {id_citizen}")
+            # Mark as sent with actual API response
+            if api_response.get('success'):
+                trace.mark_as_sent(
+                    status_code=api_response.get('status_code', 201),
+                    response_data=api_response.get('data')
+                )
+                logger.info(f"✅ Citizen {id_citizen} registered successfully in centralizer")
+            else:
+                trace.mark_as_error(
+                    error_message=api_response.get('message', 'Registration failed')
+                )
+                logger.error(f"❌ Failed to register citizen {id_citizen}: {api_response.get('message')}")
+            
             return trace
             
         except Exception as e:

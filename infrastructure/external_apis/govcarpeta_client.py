@@ -81,6 +81,66 @@ class GovcarpetaAPIClient(BaseAPIClient):
             logger.error(f"Error validating citizen {citizen_id}: {str(e)}")
             raise
     
+    def register_citizen(
+        self,
+        id_citizen: int,
+        name: str,
+        email: str,
+        address: str = "Cra 44 # 45 - 67",
+        operator_name: str = "Coordenador Ciudadano"
+    ) -> Dict[str, Any]:
+        """
+        Register a citizen in the external centralizer.
+        
+        Args:
+            id_citizen: Citizen identification number
+            name: Citizen full name
+            email: Citizen email
+            address: Citizen address (optional)
+            operator_name: Operator name (optional)
+            
+        Returns:
+            Dictionary with registration result
+            
+        Raises:
+            requests.RequestException: If the API call fails
+        """
+        endpoint = "apis/registerCitizen"
+        
+        payload = {
+            "id": id_citizen,
+            "name": name,
+            "address": address,
+            "email": email,
+            "operatorName": operator_name
+        }
+        
+        logger.info(f"Registering citizen {id_citizen} in centralizer")
+        
+        try:
+            response = self.post(endpoint, data=payload)
+            
+            if response.status_code == 201:
+                logger.info(f"Citizen {id_citizen} registered successfully")
+                return {
+                    'success': True,
+                    'status_code': 201,
+                    'message': 'Citizen registered successfully',
+                    'data': response.json() if response.text else None
+                }
+            else:
+                logger.warning(f"Failed to register citizen {id_citizen}: Status {response.status_code}")
+                return {
+                    'success': False,
+                    'status_code': response.status_code,
+                    'message': f'Registration failed: {response.status_code}',
+                    'data': response.json() if response.text else None
+                }
+                
+        except Exception as e:
+            logger.error(f"Error registering citizen {id_citizen}: {str(e)}", exc_info=True)
+            raise
+    
     def authenticate_document(
         self,
         id_citizen: int,
