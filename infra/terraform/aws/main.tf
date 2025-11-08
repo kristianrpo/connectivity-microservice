@@ -297,7 +297,7 @@ data "aws_iam_policy_document" "service_policy" {
 }
 
 resource "aws_iam_policy" "service" {
-  name_prefix = "${local.name}-policy-"
+  name        = "${local.name}-service-policy"
   description = "IAM policy for ${local.name} service"
   policy      = data.aws_iam_policy_document.service_policy.json
   
@@ -305,6 +305,10 @@ resource "aws_iam_policy" "service" {
     Name        = "${local.name}-service-policy"
     Service     = "connectivity"
     Environment = var.environment
+  }
+  
+  lifecycle {
+    create_before_destroy = false
   }
 }
 
@@ -354,7 +358,7 @@ data "aws_iam_policy_document" "external_secrets" {
 }
 
 resource "aws_iam_policy" "external_secrets" {
-  name_prefix = "${local.name}-external-secrets-policy-"
+  name        = "${local.name}-external-secrets-policy"
   description = "Allow External Secrets Operator to access ${local.name} secrets"
   policy      = data.aws_iam_policy_document.external_secrets.json
   
@@ -362,6 +366,10 @@ resource "aws_iam_policy" "external_secrets" {
     Name        = "${local.name}-eso-policy"
     Service     = "connectivity"
     Environment = var.environment
+  }
+  
+  lifecycle {
+    create_before_destroy = false
   }
 }
 
