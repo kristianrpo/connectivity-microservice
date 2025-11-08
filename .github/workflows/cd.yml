@@ -108,18 +108,6 @@ jobs:
         run: |
           echo "Attempting to import existing resources..."
           
-          # Import random_id if it exists in state from previous run
-          terraform import -input=false \
-            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
-            -var "aws_region=${{ secrets.AWS_REGION }}" \
-            random_id.suffix "any-value" 2>/dev/null || echo "random_id will be created"
-          
-          # Import random_password if it exists
-          terraform import -input=false \
-            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
-            -var "aws_region=${{ secrets.AWS_REGION }}" \
-            random_password.db_password "any-value" 2>/dev/null || echo "random_password will be created"
-          
           # Import security group (need to get the ID first)
           SG_ID=$(aws ec2 describe-security-groups \
             --filters "Name=group-name,Values=connectivity-production-rds-sg" "Name=vpc-id,Values=vpc-011c7f75f98629972" \
@@ -192,6 +180,24 @@ jobs:
             -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
             -var "aws_region=${{ secrets.AWS_REGION }}" \
             aws_db_instance.postgres connectivity-production-pg || echo "RDS instance not found or already imported"
+          
+          # Import egress rule if it exists
+          if [ -n "$SG_ID" ] && [ "$SG_ID" != "None" ]; then
+            EGRESS_RULES=$(aws ec2 describe-security-group-rules \
+              --filters "Name=group-id,Values=$SG_ID" \
+              --query 'SecurityGroupRules[?IsEgress==`true`].SecurityGroupRuleId' \
+              --output text 2>/dev/null || echo "")
+            
+            if [ -n "$EGRESS_RULES" ]; then
+              EGRESS_ARRAY=($EGRESS_RULES)
+              if [ ${#EGRESS_ARRAY[@]} -gt 0 ]; then
+                terraform import -input=false \
+                  -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+                  -var "aws_region=${{ secrets.AWS_REGION }}" \
+                  aws_vpc_security_group_egress_rule.rds_egress "${EGRESS_ARRAY[0]}" || echo "Egress rule already imported"
+              fi
+            fi
+          fi
 
       - name: Terraform Apply (all microservice resources)
         working-directory: infra/terraform/aws

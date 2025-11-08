@@ -52,8 +52,12 @@ data "aws_instance" "eks_node_sample" {
 # ============================================================================
 # Recursos del micro: RDS + Secrets + IAM
 # ============================================================================
-resource "random_id" "suffix" {
-  byte_length = 2
+# Use a fixed suffix to avoid recreating resources on every apply
+# ============================================================================
+locals {
+  # Fixed suffix based on current resources (5c2c)
+  # DO NOT CHANGE THIS - it will recreate all secrets
+  resource_suffix = "5c2c"
 }
 
 resource "random_password" "db_password" {
@@ -61,13 +65,17 @@ resource "random_password" "db_password" {
   special = true
   # Evitar caracteres que puedan causar problemas en URLs de conexión
   override_special = "!#$%&*()-_=+[]{}<>:?"
+  
+  lifecycle {
+    ignore_changes = all
+  }
 }
 
 # ----------------------------------------------------------------------------
 # Secret principal de configuración de la aplicación
 # ----------------------------------------------------------------------------
 resource "aws_secretsmanager_secret" "app" {
-  name        = "${local.name}/application-${random_id.suffix.hex}"
+  name        = "${local.name}/application-${local.resource_suffix}"
   description = "Application configuration for ${local.name}"
   
   tags = {
@@ -161,7 +169,7 @@ resource "aws_db_parameter_group" "rds" {
 }
 
 resource "aws_secretsmanager_secret" "rds_credentials" {
-  name        = "${local.name}/rds/postgresql-${random_id.suffix.hex}"
+  name        = "${local.name}/rds/postgresql-${local.resource_suffix}"
   description = "RDS PostgreSQL credentials for ${local.name}"
   
   tags = {
@@ -232,7 +240,7 @@ resource "aws_secretsmanager_secret_version" "rds_credentials_with_host" {
 # Secret con cadenas de conexión (para la app y/o External Secrets)
 # ----------------------------------------------------------------------------
 resource "aws_secretsmanager_secret" "app_connections" {
-  name        = "${local.name}/connections-${random_id.suffix.hex}"
+  name        = "${local.name}/connections-${local.resource_suffix}"
   description = "App connections for ${local.name}"
   
   tags = {

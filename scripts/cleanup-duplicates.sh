@@ -9,8 +9,8 @@ echo "=== Cleaning up duplicate AWS resources ==="
 echo "Region: $REGION"
 echo ""
 
-# Keep only the most recent suffix: d7cf
-KEEP_SUFFIX="d7cf"
+# Keep only the most recent suffix: 5c2c
+KEEP_SUFFIX="5c2c"
 
 echo "Keeping resources with suffix: $KEEP_SUFFIX"
 echo "Deleting all others..."
@@ -21,8 +21,8 @@ echo ""
 # ============================================================================
 echo "=== Deleting old Secrets Manager secrets ==="
 
-# Old suffixes to delete
-OLD_SUFFIXES=("be43" "31b6" "bcef" "929a" "14a5")
+# Old suffixes to delete (keep only 5c2c)
+OLD_SUFFIXES=("d7cf")
 
 for suffix in "${OLD_SUFFIXES[@]}"; do
   echo "Deleting secrets with suffix: $suffix"
@@ -63,8 +63,8 @@ echo "Found policies:"
 echo "$POLICIES" | jq -r '.[] | "  - \(.Name)"'
 echo ""
 
-# Delete policies that don't match the current timestamp pattern
-echo "$POLICIES" | jq -r '.[] | select(.Name | contains("20251108012759") | not) | .Arn' | while read -r policy_arn; do
+# Delete policies that don't match the current timestamp pattern (keep only 20251108014126)
+echo "$POLICIES" | jq -r '.[] | select(.Name | contains("20251108014126") | not) | .Arn' | while read -r policy_arn; do
   if [ -n "$policy_arn" ]; then
     POLICY_NAME=$(echo "$POLICIES" | jq -r --arg arn "$policy_arn" '.[] | select(.Arn == $arn) | .Name')
     echo "Deleting policy: $POLICY_NAME"
