@@ -20,7 +20,7 @@ variable "aws_region" {
 variable "shared_state_key" {
   description = "S3 key for shared infrastructure Terraform state"
   type        = string
-  default     = "shared/infra/terraform/aws/terraform.tfstate"
+  default     = "shared/terraform.tfstate"
 }
 
 # ============================================================================
