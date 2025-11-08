@@ -181,31 +181,13 @@ jobs:
             -var "aws_region=${{ secrets.AWS_REGION }}" \
             aws_db_instance.postgres connectivity-production-pg || echo "RDS instance not found or already imported"
 
-      - name: Terraform Apply (microservice resources - without ALB)
+      - name: Terraform Apply (all microservice resources)
         working-directory: infra/terraform/aws
         run: |
+          echo "Applying all Terraform resources..."
           terraform apply -auto-approve -input=false \
             -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
-            -var "aws_region=${{ secrets.AWS_REGION }}" \
-            -target random_id.suffix \
-            -target data.aws_instances.eks_nodes \
-            -target data.aws_instance.eks_node_sample \
-            -target aws_security_group.rds \
-            -target aws_vpc_security_group_ingress_rule.rds_ingress_cidr \
-            -target aws_vpc_security_group_ingress_rule.rds_ingress_from_nodes \
-            -target aws_secretsmanager_secret.app \
-            -target aws_secretsmanager_secret.rds_credentials \
-            -target aws_secretsmanager_secret_version.rds_credentials_initial \
-            -target aws_secretsmanager_secret_version.rds_credentials_with_host \
-            -target aws_secretsmanager_secret.app_connections \
-            -target aws_secretsmanager_secret_version.app_connections \
-            -target aws_db_instance.postgres \
-            -target data.aws_iam_policy_document.service_policy \
-            -target aws_iam_policy.service \
-            -target data.aws_iam_policy_document.external_secrets \
-            -target aws_iam_policy.external_secrets \
-            -target aws_iam_role_policy_attachment.eso_attach \
-            -target module.irsa
+            -var "aws_region=${{ secrets.AWS_REGION }}"
 
   app-deploy:
     name: Deploy Application to EKS (kubectl/kustomize) - Phase 2
