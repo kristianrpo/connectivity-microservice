@@ -108,6 +108,18 @@ jobs:
         run: |
           echo "Attempting to import existing resources..."
           
+          # Import random_id if it exists in state from previous run
+          terraform import -input=false \
+            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            random_id.suffix "any-value" 2>/dev/null || echo "random_id will be created"
+          
+          # Import random_password if it exists
+          terraform import -input=false \
+            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            random_password.db_password "any-value" 2>/dev/null || echo "random_password will be created"
+          
           # Import security group (need to get the ID first)
           SG_ID=$(aws ec2 describe-security-groups \
             --filters "Name=group-name,Values=connectivity-production-rds-sg" "Name=vpc-id,Values=vpc-011c7f75f98629972" \
@@ -222,12 +234,16 @@ jobs:
       - name: Terraform Init
         working-directory: infra/terraform/aws
         run: |
+          echo "Initializing Terraform to read outputs..."
           terraform init -input=false \
             -backend-config="bucket=$TF_BACKEND_BUCKET" \
             -backend-config="key=$TF_BACKEND_KEY" \
             -backend-config="region=$TF_BACKEND_REGION" \
             -backend-config="dynamodb_table=$TF_BACKEND_DDB_TABLE" \
             -backend-config="encrypt=true"
+          
+          echo "Verifying outputs..."
+          terraform output || echo "No outputs available yet"
 
       - name: Debug shared infrastructure outputs
         run: |
