@@ -310,7 +310,51 @@ jobs:
           echo "Updating kubeconfig..."
           aws eks update-kubeconfig --name "$CLUSTER_NAME" --region ${{ secrets.AWS_REGION }}
 
+      - name: Check if deployment is ready
+        id: check_ready
+        env:
+          TF_DIR: infra/terraform/aws
+        run: |
+          echo "Checking if all required Terraform outputs are available..."
+          
+          # Try to get each output, suppress errors
+          SECRET_NAME=$(terraform -chdir=$TF_DIR output -raw app_secret_name 2>/dev/null || echo "")
+          RABBIT_URL=$(terraform -chdir=$TF_DIR output -raw rabbitmq_amqp_url 2>/dev/null || echo "")
+          RDS_ENDPOINT=$(terraform -chdir=$TF_DIR output -raw rds_endpoint 2>/dev/null || echo "")
+          RDS_SECRET_ARN=$(terraform -chdir=$TF_DIR output -raw rds_secret_arn 2>/dev/null || echo "")
+          IRSA_ROLE=$(terraform -chdir=$TF_DIR output -raw irsa_role_arn 2>/dev/null || echo "")
+          
+          # Check if any are missing
+          if [ -z "$SECRET_NAME" ] || [ -z "$RABBIT_URL" ] || [ -z "$RDS_ENDPOINT" ] || [ -z "$RDS_SECRET_ARN" ] || [ -z "$IRSA_ROLE" ]; then
+            echo "❌ Some Terraform outputs are not available yet."
+            echo "This is normal on first deployment while RDS is being created."
+            echo ""
+            echo "Output Status:"
+            echo "  SECRET_NAME: ${SECRET_NAME:-MISSING}"
+            echo "  RABBIT_URL: ${RABBIT_URL:-MISSING}"
+            echo "  RDS_ENDPOINT: ${RDS_ENDPOINT:-MISSING}"
+            echo "  RDS_SECRET_ARN: ${RDS_SECRET_ARN:-MISSING}"
+            echo "  IRSA_ROLE: ${IRSA_ROLE:-MISSING}"
+            echo ""
+            echo "deployment_ready=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Infrastructure not fully ready. Skipping deployment steps."
+            echo "💡 Run the pipeline again in a few minutes after RDS creation completes."
+          else
+            echo "✅ All required outputs are available!"
+            echo ""
+            echo "Output Status:"
+            echo "  SECRET_NAME: ✓"
+            echo "  RABBIT_URL: ✓"
+            echo "  RDS_ENDPOINT: ✓"
+            echo "  RDS_SECRET_ARN: ✓"
+            echo "  IRSA_ROLE: ✓"
+            echo ""
+            echo "deployment_ready=true" >> $GITHUB_OUTPUT
+            echo "🚀 Proceeding with deployment..."
+          fi
+
       - name: Prepare AWS Secrets for app
+        if: steps.check_ready.outputs.deployment_ready == 'true'
         env:
           TF_DIR: infra/terraform/aws
         run: |
@@ -375,6 +419,7 @@ jobs:
               }')" || true
 
       - name: Render K8s templates
+        if: steps.check_ready.outputs.deployment_ready == 'true'
         env:
           TF_DIR: infra/terraform/aws
         run: |
@@ -388,17 +433,21 @@ jobs:
           sed -i "s|IRSA_ROLE_ARN|$IRSA_ROLE|g" k8s/base/service-account.yaml
 
       - name: Delete old ExternalSecret
+        if: steps.check_ready.outputs.deployment_ready == 'true'
         run: |
           kubectl -n connectivity delete externalsecret connectivity-secrets --ignore-not-found=true
           sleep 5
 
       - name: Deploy application
+        if: steps.check_ready.outputs.deployment_ready == 'true'
         run: kubectl apply -k k8s/overlays/prod/
 
       - name: Force rolling update
+        if: steps.check_ready.outputs.deployment_ready == 'true'
         run: kubectl rollout restart deployment/connectivity-service -n connectivity
 
       - name: Wait for External Secrets
+        if: steps.check_ready.outputs.deployment_ready == 'true'
         run: |
           for i in {1..12}; do
             if kubectl -n connectivity get secret connectivity-secrets &>/dev/null; then
@@ -410,9 +459,11 @@ jobs:
           done
 
       - name: Wait for deployment rollout
+        if: steps.check_ready.outputs.deployment_ready == 'true'
         run: kubectl -n connectivity rollout status deploy/connectivity-service --timeout=300s
 
       - name: Verify migrations ran successfully
+        if: steps.check_ready.outputs.deployment_ready == 'true'
         run: |
           echo "Checking if migrations ran successfully via init container..."
           POD=$(kubectl -n connectivity get pods -l app=connectivity-service --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
@@ -426,6 +477,7 @@ jobs:
           fi
 
       - name: Display Access Information
+        if: steps.check_ready.outputs.deployment_ready == 'true'
         run: |
           echo "=== Deployment Summary ==="
           ALB_HOSTNAME=$(kubectl -n connectivity get ingress connectivity-ingress -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
