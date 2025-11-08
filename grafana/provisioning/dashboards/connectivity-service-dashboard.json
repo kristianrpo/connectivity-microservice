@@ -1,140 +1,85 @@
 {
   "uid": "connectivity-microservice",
   "title": "Connectivity Microservice - Overview",
-  "tags": [
-    "connectivity",
-    "microservice",
-    "django"
-  ],
+  "tags": ["connectivity", "microservice", "django"],
   "timezone": "browser",
-  "schemaVersion": 16,
-  "version": 0,
-  "refresh": "5s",
+  "schemaVersion": 27,
+  "version": 1,
+  "refresh": "10s",
   "panels": [
     {
       "id": 1,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 0
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
       "type": "graph",
-      "title": "Request Rate (req/s) - Excluding Health Checks",
+      "title": "API Request Rate (excl. health checks)",
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "rate(django_http_requests_total_by_method_total{view!~\".*health.*\"}[5m])",
-          "legendFormat": "{{method}} - {{view}}",
-          "refId": "A"
-        }
-      ],
-      "yaxes": [
-        {
-          "format": "reqps",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": 0,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ]
-    },
-    {
-      "id": 2,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      },
-      "type": "graph",
-      "title": "Request Duration (avg)",
-      "datasource": "Prometheus",
-      "targets": [
-        {
-          "expr": "rate(django_http_requests_latency_seconds_by_view_method_sum[5m]) / rate(django_http_requests_latency_seconds_by_view_method_count[5m])",
+          "expr": "rate(django_http_requests_total_by_view_transport_method_total{view!~\".*health.*\"}[5m])",
           "legendFormat": "{{method}} {{view}}",
           "refId": "A"
         }
       ],
       "yaxes": [
+        {"format": "reqps", "label": null, "logBase": 1, "max": null, "min": 0, "show": true},
+        {"format": "short", "label": null, "logBase": 1, "max": null, "min": null, "show": true}
+      ]
+    },
+    {
+      "id": 2,
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "type": "graph",
+      "title": "Response Time (p95)",
+      "datasource": "Prometheus",
+      "targets": [
         {
-          "format": "s",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": 0,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
+          "expr": "histogram_quantile(0.95, rate(django_http_requests_latency_seconds_by_view_method_bucket{view!~\".*health.*\"}[5m]))",
+          "legendFormat": "{{view}}",
+          "refId": "A"
         }
+      ],
+      "yaxes": [
+        {"format": "s", "label": null, "logBase": 1, "max": null, "min": 0, "show": true},
+        {"format": "short", "label": null, "logBase": 1, "max": null, "min": null, "show": true}
       ]
     },
     {
       "id": 3,
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 0,
-        "y": 8
-      },
+      "gridPos": {"h": 5, "w": 8, "x": 0, "y": 8},
       "type": "singlestat",
-      "title": "Total Requests (excl. health)",
+      "title": "Total API Requests (24h)",
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "sum(django_http_requests_total_by_method_total{view!~\".*health.*\"})",
+          "expr": "sum(increase(django_http_requests_total_by_view_transport_method_total{view!~\".*health.*\"}[24h])) or vector(0)",
           "refId": "A"
         }
       ],
       "format": "none",
       "valueName": "current",
-      "colors": [
-        "#299c46",
-        "#e0b400",
-        "#bf1b00"
-      ],
-      "thresholds": ""
+      "colors": ["#299c46", "#e0b400", "#bf1b00"],
+      "thresholds": "",
+      "sparkline": {
+        "show": true,
+        "lineColor": "rgb(31, 120, 193)",
+        "fillColor": "rgba(31, 118, 189, 0.18)"
+      }
     },
     {
       "id": 4,
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 6,
-        "y": 8
-      },
+      "gridPos": {"h": 5, "w": 8, "x": 8, "y": 8},
       "type": "singlestat",
-      "title": "Citizen Validations",
+      "title": "Citizen Validations (24h)",
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "sum(increase(django_http_requests_total_by_view_transport_method_total{view=~\".*validate.*citizen.*\"}[24h])) or vector(0)",
+          "expr": "sum(increase(django_http_requests_total_by_view_transport_method_total{view=~\".*check.*citizen.*\"}[24h])) or vector(0)",
           "refId": "A"
         }
       ],
       "format": "none",
       "valueName": "current",
-      "colors": [
-        "#299c46",
-        "#e0b400",
-        "#bf1b00"
-      ],
+      "colors": ["#299c46", "#e0b400", "#bf1b00"],
       "thresholds": "",
       "sparkline": {
         "show": true,
@@ -144,74 +89,29 @@
     },
     {
       "id": 5,
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 12,
-        "y": 8
-      },
+      "gridPos": {"h": 5, "w": 8, "x": 16, "y": 8},
       "type": "singlestat",
-      "title": "Document Authentications",
+      "title": "Service Status",
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "sum(increase(django_http_requests_total_by_view_transport_method_total{view=~\".*document.*auth.*\"}[24h])) or vector(0)",
+          "expr": "up{job=\"connectivity-service\"}",
           "refId": "A"
         }
       ],
       "format": "none",
       "valueName": "current",
-      "colors": [
-        "#299c46",
-        "#e0b400",
-        "#bf1b00"
+      "valueMaps": [
+        {"value": "0", "text": "DOWN"},
+        {"value": "1", "text": "UP"}
       ],
-      "thresholds": "",
-      "sparkline": {
-        "show": true,
-        "lineColor": "rgb(31, 120, 193)",
-        "fillColor": "rgba(31, 118, 189, 0.18)"
-      }
+      "colors": ["#bf1b00", "#e0b400", "#299c46"],
+      "thresholds": "0.5,1",
+      "colorBackground": true
     },
     {
       "id": 6,
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 18,
-        "y": 8
-      },
-      "type": "singlestat",
-      "title": "External API Calls (24h)",
-      "datasource": "Prometheus",
-      "targets": [
-        {
-          "expr": "sum(increase(django_http_requests_total_by_view_transport_method_total{view=~\".*(validate|register|authenticate).*\",view!~\".*health.*\"}[24h])) or vector(0)",
-          "refId": "A"
-        }
-      ],
-      "format": "none",
-      "valueName": "current",
-      "colors": [
-        "#299c46",
-        "#e0b400",
-        "#bf1b00"
-      ],
-      "thresholds": "",
-      "sparkline": {
-        "show": true,
-        "lineColor": "rgb(31, 120, 193)",
-        "fillColor": "rgba(31, 118, 189, 0.18)"
-      }
-    },
-    {
-      "id": 7,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 13
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
       "type": "graph",
       "title": "HTTP Status Codes (excl. health)",
       "datasource": "Prometheus",
@@ -233,32 +133,13 @@
         }
       ],
       "yaxes": [
-        {
-          "format": "reqps",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": 0,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
+        {"format": "reqps", "label": null, "logBase": 1, "max": null, "min": 0, "show": true},
+        {"format": "short", "label": null, "logBase": 1, "max": null, "min": null, "show": true}
       ]
     },
     {
-      "id": 8,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 13
-      },
+      "id": 7,
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
       "type": "graph",
       "title": "Database Operations",
       "datasource": "Prometheus",
@@ -270,69 +151,13 @@
         }
       ],
       "yaxes": [
-        {
-          "format": "ops",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": 0,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
+        {"format": "ops", "label": null, "logBase": 1, "max": null, "min": 0, "show": true},
+        {"format": "short", "label": null, "logBase": 1, "max": null, "min": null, "show": true}
       ]
     },
     {
-      "id": 9,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 21
-      },
-      "type": "graph",
-      "title": "Database Query Duration",
-      "datasource": "Prometheus",
-      "targets": [
-        {
-          "expr": "rate(django_db_query_duration_seconds_sum[5m]) / rate(django_db_query_duration_seconds_count[5m])",
-          "legendFormat": "Avg Query Time",
-          "refId": "A"
-        }
-      ],
-      "yaxes": [
-        {
-          "format": "s",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": 0,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ]
-    },
-    {
-      "id": 10,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 21
-      },
+      "id": 8,
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 21},
       "type": "graph",
       "title": "Memory Usage (MB)",
       "datasource": "Prometheus",
@@ -349,116 +174,49 @@
         }
       ],
       "yaxes": [
+        {"format": "mbytes", "label": null, "logBase": 1, "max": null, "min": 0, "show": true},
+        {"format": "short", "label": null, "logBase": 1, "max": null, "min": null, "show": true}
+      ]
+    },
+    {
+      "id": 9,
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 21},
+      "type": "graph",
+      "title": "Database Query Duration",
+      "datasource": "Prometheus",
+      "targets": [
         {
-          "format": "mbytes",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": 0,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
+          "expr": "rate(django_db_query_duration_seconds_sum[5m]) / rate(django_db_query_duration_seconds_count[5m])",
+          "legendFormat": "Avg Query Time",
+          "refId": "A"
         }
+      ],
+      "yaxes": [
+        {"format": "s", "label": null, "logBase": 1, "max": null, "min": 0, "show": true},
+        {"format": "short", "label": null, "logBase": 1, "max": null, "min": null, "show": true}
+      ]
+    },
+    {
+      "id": 10,
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 29},
+      "type": "graph",
+      "title": "API Endpoint Breakdown",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "rate(django_http_requests_total_by_view_transport_method_total{view!~\".*health.*\"}[5m])",
+          "legendFormat": "{{view}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        {"format": "reqps", "label": null, "logBase": 1, "max": null, "min": 0, "show": true},
+        {"format": "short", "label": null, "logBase": 1, "max": null, "min": null, "show": true}
       ]
     },
     {
       "id": 11,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 29
-      },
-      "type": "graph",
-      "title": "API Operation Rates (ops/s)",
-      "datasource": "Prometheus",
-      "targets": [
-        {
-          "expr": "rate(django_http_requests_total_by_view_transport_method_total{view=~\".*citizen.*validation.*\"}[5m])",
-          "legendFormat": "Citizen Validations",
-          "refId": "A"
-        },
-        {
-          "expr": "rate(django_http_requests_total_by_view_transport_method_total{view=~\".*citizen.*registration.*\"}[5m])",
-          "legendFormat": "Citizen Registrations",
-          "refId": "B"
-        },
-        {
-          "expr": "rate(django_http_requests_total_by_view_transport_method_total{view=~\".*document.*auth.*\"}[5m])",
-          "legendFormat": "Document Authentications",
-          "refId": "C"
-        }
-      ],
-      "yaxes": [
-        {
-          "format": "ops",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": 0,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ]
-    },
-    {
-      "id": 12,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 29
-      },
-      "type": "graph",
-      "title": "Python Process Info",
-      "datasource": "Prometheus",
-      "targets": [
-        {
-          "expr": "python_info{job=\"connectivity-service\"}",
-          "legendFormat": "Python {{version}}",
-          "refId": "A"
-        }
-      ],
-      "yaxes": [
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": 0,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ]
-    },
-    {
-      "id": 13,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 37
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 29},
       "type": "stat",
       "title": "Service Health Status",
       "datasource": "Prometheus",
@@ -473,235 +231,25 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {
-                "value": 0,
-                "color": "red"
-              },
-              {
-                "value": 1,
-                "color": "green"
-              }
+              {"value": 0, "color": "red"},
+              {"value": 1, "color": "green"}
             ]
           },
           "mappings": [
             {
               "type": "value",
               "options": {
-                "0": {
-                  "text": "DOWN"
-                },
-                "1": {
-                  "text": "UP"
-                }
+                "0": {"text": "DOWN"},
+                "1": {"text": "UP"}
               }
             }
           ]
         }
       }
-    },
-    {
-      "id": 14,
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 37
-      },
-      "type": "stat",
-      "title": "Service Firing Alerts",
-      "datasource": "Prometheus",
-      "targets": [
-        {
-          "expr": "count(ALERTS{alertstate=\"firing\", job=\"connectivity-service\"})",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "value": 0,
-                "color": "green"
-              },
-              {
-                "value": 0.5,
-                "color": "yellow"
-              },
-              {
-                "value": 1,
-                "color": "red"
-              }
-            ]
-          },
-          "unit": "short"
-        }
-      }
-    },
-    {
-      "id": 15,
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 37
-      },
-      "type": "stat",
-      "title": "Service Pending Alerts",
-      "datasource": "Prometheus",
-      "targets": [
-        {
-          "expr": "count(ALERTS{alertstate=\"pending\", job=\"connectivity-service\"})",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "value": 0,
-                "color": "green"
-              },
-              {
-                "value": 0.5,
-                "color": "yellow"
-              },
-              {
-                "value": 1,
-                "color": "orange"
-              }
-            ]
-          },
-          "unit": "short"
-        }
-      }
-    },
-    {
-      "id": 16,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 41
-      },
-      "type": "table",
-      "title": "Connectivity Service Alerts",
-      "datasource": "Prometheus",
-      "targets": [
-        {
-          "expr": "ALERTS{alertstate=~\"firing|pending\", job=\"connectivity-service\"}",
-          "format": "table",
-          "refId": "A"
-        }
-      ],
-      "options": {
-        "showHeader": true,
-        "sortBy": [
-          {
-            "displayName": "alertstate",
-            "desc": true
-          },
-          {
-            "displayName": "alertname",
-            "desc": false
-          }
-        ]
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "displayMode": "color-background",
-            "sort": "asc"
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "alertstate"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "firing": {
-                        "text": "🔥 FIRING",
-                        "color": "red"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "pending": {
-                        "text": "⏳ PENDING",
-                        "color": "yellow"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "inactive": {
-                        "text": "✅ OK",
-                        "color": "green"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "alertname"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Alert Name"
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": 17,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 45
-      },
-      "type": "text",
-      "title": "📋 Alert Definitions",
-      "options": {
-        "content": "## Available Alerts:\n\n**HTTP Alerts:**\n- HighErrorRate\n- CriticalErrorRate\n- SlowRequests\n- ServiceDown\n\n**External API Alerts:**\n- HighExternalAPIErrorRate\n- HighCitizenValidationFailures\n\n**Database Alerts:**\n- HighDatabaseErrorRate\n- SlowDatabaseQueries\n- DatabaseConnectionIssues\n\n**RabbitMQ Alerts:**\n- HighMessageQueueErrors\n- HighQueueDepth\n\n**Resource Alerts:**\n- HighMemoryUsage\n- HighRequestConcurrency\n\n**Security Alerts:**\n- HighUnauthorizedAttempts\n- SuspiciousActivity"
-      }
     }
   ],
-  "time": {
-    "from": "now-15m",
-    "to": "now"
-  },
+  "time": {"from": "now-1h", "to": "now"},
   "timepicker": {
-    "refresh_intervals": [
-      "5s",
-      "10s",
-      "30s",
-      "1m",
-      "5m",
-      "15m",
-      "30m",
-      "1h"
-    ]
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m"]
   }
 }
