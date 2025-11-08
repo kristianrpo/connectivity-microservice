@@ -181,22 +181,44 @@ jobs:
             -var "aws_region=${{ secrets.AWS_REGION }}" \
             aws_db_instance.postgres connectivity-production-pg || echo "RDS instance not found or already imported"
           
-          # Import Secrets Manager secrets (with suffix 5c2c)
+          # Import Secrets Manager secrets (need ARNs, not names)
           echo "Importing Secrets Manager secrets..."
-          terraform import -input=false \
-            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
-            -var "aws_region=${{ secrets.AWS_REGION }}" \
-            aws_secretsmanager_secret.app connectivity-production/application-5c2c || echo "App secret not found or already imported"
           
-          terraform import -input=false \
-            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
-            -var "aws_region=${{ secrets.AWS_REGION }}" \
-            aws_secretsmanager_secret.rds_credentials connectivity-production/rds/postgresql-5c2c || echo "RDS secret not found or already imported"
+          # Get ARN for app secret
+          APP_SECRET_ARN=$(aws secretsmanager describe-secret \
+            --secret-id connectivity-production/application-5c2c \
+            --region ${{ secrets.AWS_REGION }} \
+            --query 'ARN' --output text 2>/dev/null || echo "")
+          if [ -n "$APP_SECRET_ARN" ]; then
+            terraform import -input=false \
+              -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+              -var "aws_region=${{ secrets.AWS_REGION }}" \
+              aws_secretsmanager_secret.app "$APP_SECRET_ARN" || echo "App secret already imported"
+          fi
           
-          terraform import -input=false \
-            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
-            -var "aws_region=${{ secrets.AWS_REGION }}" \
-            aws_secretsmanager_secret.app_connections connectivity-production/connections-5c2c || echo "Connections secret not found or already imported"
+          # Get ARN for RDS secret
+          RDS_SECRET_ARN=$(aws secretsmanager describe-secret \
+            --secret-id connectivity-production/rds/postgresql-5c2c \
+            --region ${{ secrets.AWS_REGION }} \
+            --query 'ARN' --output text 2>/dev/null || echo "")
+          if [ -n "$RDS_SECRET_ARN" ]; then
+            terraform import -input=false \
+              -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+              -var "aws_region=${{ secrets.AWS_REGION }}" \
+              aws_secretsmanager_secret.rds_credentials "$RDS_SECRET_ARN" || echo "RDS secret already imported"
+          fi
+          
+          # Get ARN for connections secret
+          CONN_SECRET_ARN=$(aws secretsmanager describe-secret \
+            --secret-id connectivity-production/connections-5c2c \
+            --region ${{ secrets.AWS_REGION }} \
+            --query 'ARN' --output text 2>/dev/null || echo "")
+          if [ -n "$CONN_SECRET_ARN" ]; then
+            terraform import -input=false \
+              -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+              -var "aws_region=${{ secrets.AWS_REGION }}" \
+              aws_secretsmanager_secret.app_connections "$CONN_SECRET_ARN" || echo "Connections secret already imported"
+          fi
           
           # Import random_password (it exists in state from previous run)
           terraform import -input=false \
