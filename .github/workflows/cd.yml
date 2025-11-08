@@ -108,11 +108,21 @@ jobs:
         run: |
           echo "Attempting to import existing resources..."
           
-          # Import security group
-          terraform import -input=false \
-            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
-            -var "aws_region=${{ secrets.AWS_REGION }}" \
-            aws_security_group.rds connectivity-production-rds-sg || echo "Security group not found or already imported"
+          # Import security group (need to get the ID first)
+          SG_ID=$(aws ec2 describe-security-groups \
+            --filters "Name=group-name,Values=connectivity-production-rds-sg" "Name=vpc-id,Values=vpc-011c7f75f98629972" \
+            --query 'SecurityGroups[0].GroupId' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -n "$SG_ID" ] && [ "$SG_ID" != "None" ]; then
+            echo "Found security group: $SG_ID"
+            terraform import -input=false \
+              -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+              -var "aws_region=${{ secrets.AWS_REGION }}" \
+              aws_security_group.rds "$SG_ID" || echo "Security group already imported"
+          else
+            echo "Security group not found, will be created"
+          fi
           
           # Import DB subnet group
           terraform import -input=false \
