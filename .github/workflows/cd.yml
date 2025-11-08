@@ -181,6 +181,29 @@ jobs:
             -var "aws_region=${{ secrets.AWS_REGION }}" \
             aws_db_instance.postgres connectivity-production-pg || echo "RDS instance not found or already imported"
           
+          # Import Secrets Manager secrets (with suffix 5c2c)
+          echo "Importing Secrets Manager secrets..."
+          terraform import -input=false \
+            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            aws_secretsmanager_secret.app connectivity-production/application-5c2c || echo "App secret not found or already imported"
+          
+          terraform import -input=false \
+            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            aws_secretsmanager_secret.rds_credentials connectivity-production/rds/postgresql-5c2c || echo "RDS secret not found or already imported"
+          
+          terraform import -input=false \
+            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            aws_secretsmanager_secret.app_connections connectivity-production/connections-5c2c || echo "Connections secret not found or already imported"
+          
+          # Import random_password (it exists in state from previous run)
+          terraform import -input=false \
+            -var "tf_backend_bucket=$TF_BACKEND_BUCKET" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            random_password.db_password none 2>/dev/null || echo "random_password will be created"
+          
           # Import egress rule if it exists
           if [ -n "$SG_ID" ] && [ "$SG_ID" != "None" ]; then
             EGRESS_RULES=$(aws ec2 describe-security-group-rules \
